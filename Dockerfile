@@ -1,5 +1,7 @@
 FROM node:16 as debug
 
+RUN mkdir -p /usr/share/app
+
 WORKDIR /usr/src/app
 
 COPY package*.json ./
