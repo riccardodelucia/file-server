@@ -58,6 +58,10 @@ app.get("/upload-status", (req, res) => {
   }
 });
 
+app.delete("/upload", (req, res) => {
+  res.status(204);
+});
+
 app.post("/upload", (req, res) => {
   const contentRange = req.headers["content-range"];
   const fileId = req.headers["x-file-id"];
