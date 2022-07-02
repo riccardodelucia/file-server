@@ -21,4 +21,4 @@ pnpm-debug.log*
 node_modules
 
 # other ignores
-uploads
+uploads/
