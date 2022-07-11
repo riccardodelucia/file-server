@@ -2,135 +2,157 @@
 
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const { promisify } = require("util");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+const xss = require("xss-clean");
+const hpp = require("hpp");
 const Busboy = require("busboy");
+const { default: PQueue } = require("p-queue");
+const { multipartUpload } = require("./s3");
+
+const { publish } = require("./publisher");
 
 // Constants
 const PORT = 8080;
 const HOST = "0.0.0.0";
 
+const uploadStatus = {
+  UPLOADED: "uploaded",
+  ERROR: "error",
+};
+
+const environment = process.env.NODE_ENV;
+
+const corsOptions =
+  environment === "development"
+    ? {
+        origin: "*",
+        methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+        preflightContinue: false,
+        optionsSuccessStatus: 204,
+      }
+    : {
+        origin: "https://iorio-apps.fht.org",
+        methods: "POST",
+        preflightContinue: false,
+        optionsSuccessStatus: 204,
+      };
+
 // App
 const app = express();
 
-app.use(express.json());
-app.use(cors());
+app.enable("trust proxy");
 
-const getFileDetails = promisify(fs.stat);
+if (environment === "development") {
+  app.use(morgan("dev"));
+  app.use(cors());
+} else if (environment === "production") {
+  app.use(morgan("tiny"));
+  app.use(
+    cors({
+      origin: "https://iorio-apps.fht.org",
+      methods: "POST",
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    })
+  );
+} else throw new Error(`Wrong ENV_VAR value: ${environment}`);
 
-const getFilePath = (fileName, fileId) =>
-  `/usr/share/app/uploads/file-${fileId}-${fileName}`;
-
-const uniqueAlphaNumericId = (() => {
-  const heyStack = "0123456789abcdefghijklmnopqrstuvwxyz";
-  const randomInt = () =>
-    Math.floor(Math.random() * Math.floor(heyStack.length));
-
-  return (length = 24) =>
-    Array.from({ length }, () => heyStack[randomInt()]).join("");
-})();
-
-app.post("/upload-request", (req, res) => {
-  if (!req.body || !req.body.fileName) {
-    res.status(400).json({ message: 'Missing "fileName"' });
-  } else {
-    const fileId = uniqueAlphaNumericId();
-    fs.createWriteStream(getFilePath(req.body.fileName, fileId), {
-      flags: "w",
-    });
-    res.status(200).json({ fileId });
-  }
+const limiter = rateLimit({
+  max: 200,
+  windowMs: 60 * 60 * 1000,
+  message: "Too many requests from this IP, please try again in one hour.",
 });
+app.use(limiter);
 
-app.get("/upload-status", (req, res) => {
-  if (req.query && req.query.fileName && req.query.fileId) {
-    getFileDetails(getFilePath(req.query.fileName, req.query.fileId))
-      .then((stats) => {
-        res.status(200).json({ totalChunkUploaded: stats.size });
-      })
-      .catch((err) => {
-        console.error("failed to read file", err);
-        res.status(400).json({
-          message: "No file with such credentials",
-          credentials: req.query,
-        });
-      });
-  }
-});
+app.use(helmet());
+
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "20GB" })); //max allowed file upload size
+app.use(xss());
+
+app.use(
+  hpp({
+    whitelist: [],
+  })
+); //no query parameters allowed so far
 
 app.delete("/upload", (req, res) => {
   res.status(204);
 });
 
-app.post("/upload", (req, res) => {
-  const contentRange = req.headers["content-range"];
-  const fileId = req.headers["x-file-id"];
+app.post("/upload", async (req, res, next) => {
+  const uploadId = req.headers["x-upload-id"];
 
-  if (!contentRange) {
-    console.log("Missing Content-Range");
-    return res.status(400).json({ message: 'Missing "Content-Range" header' });
+  if (!uploadId) {
+    console.log("Missing Upload Id");
+    return res.status(400).json({ message: 'Missing "X-Upload-Id" header' });
   }
 
-  if (!fileId) {
-    console.log("Missing File Id");
-    return res.status(400).json({ message: 'Missing "X-File-Id" header' });
-  }
+  // check: https://stackoverflow.com/questions/63632422/express-js-how-handle-errors-with-busboy
 
-  const match = contentRange.match(/bytes=(\d+)-(\d+)\/(\d+)/);
-
-  if (!match) {
-    console.log("Invalid Content-Range Format");
-    return res.status(400).json({ message: 'Invalid "Content-Range" Format' });
-  }
-
-  const rangeStart = Number(match[1]);
-  const rangeEnd = Number(match[2]);
-  const fileSize = Number(match[3]);
-
-  if (rangeStart >= fileSize || rangeStart >= rangeEnd || rangeEnd > fileSize) {
-    return res
-      .status(400)
-      .json({ message: 'Invalid "Content-Range" provided' });
-  }
+  const info = {};
+  let filename = undefined;
+  let objectKey = undefined;
 
   const busboy = Busboy({ headers: req.headers });
+  const workQueue = new PQueue({ concurrency: 1 });
 
-  busboy.on("file", (_, file, fileName) => {
-    const { filename } = fileName;
-    const filePath = getFilePath(filename, fileId);
-    if (!fileId) {
-      req.pause();
+  async function abort(e, code = 500) {
+    req.unpipe(busboy);
+    workQueue.pause();
+    try {
+      await publish(uploadStatus.ERROR, uploadId, filename, objectKey, info);
+    } catch (error) {
+      console.error("Unable to send message to the subscriber: ", error);
+    } finally {
+      res.status(code);
+      res.send(e?.message);
     }
+  }
 
-    getFileDetails(filePath)
-      .then((stats) => {
-        if (stats.size !== rangeStart) {
-          return res.status(400).json({ message: 'Bad "chunk" provided' });
-        }
+  async function handleError(fn) {
+    workQueue.add(async () => {
+      try {
+        await fn();
+      } catch (e) {
+        await abort(e);
+      }
+    });
+  }
 
-        file
-          .pipe(fs.createWriteStream(filePath, { flags: "a" }))
-          .on("error", (e) => {
-            console.error("failed upload", e);
-            res.sendStatus(500);
-          });
-      })
-      .catch((err) => {
-        console.log("No File Match", err);
-        res.status(400).json({
-          message: "No file with such credentials",
-          credentials: req.query,
-        });
-      });
+  busboy.on("file", (_, file, fileInfo) => {
+    handleError(async () => {
+      filename = fileInfo.filename;
+      const date = String(Date.now());
+      objectKey = [uploadId, date, filename].join("/");
+      await multipartUpload(file, objectKey);
+    });
+  });
+
+  busboy.on("field", (name, val) => {
+    handleError(async () => {
+      // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
+      info[name] = val;
+    });
+  });
+
+  busboy.on("finish", async () => {
+    handleError(async () => {
+      await publish(uploadStatus.UPLOADED, uploadId, filename, objectKey, info);
+      res.sendStatus(200);
+    });
+  });
+
+  req.on("aborted", () => {
+    abort(new Error("Connection aborted"), 499);
   });
 
   busboy.on("error", (e) => {
-    console.error("failed upload", e);
-    res.sendStatus(500);
-  });
-
-  busboy.on("finish", () => {
-    res.sendStatus(200);
+    abort(e);
   });
 
   req.pipe(busboy);

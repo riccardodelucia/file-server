@@ -4,22 +4,17 @@ services:
   nodejs:
     build:
       context: .
+      target: build
     command: [ "npm", "run", "debug" ]
     ports:
       - 8888:8080
       - 9229:9229
     volumes:
       - ./src:/usr/src/app/src
-      - ./uploads:/usr/share/app/uploads
+    env_file: .env
+    networks:
+      - local-dev
 
-  minio:
-    restart: always
-    image: minio/minio:latest
-    ports:
-      - 9001:9000
-    volumes:
-      - s3_data:/data
-    command: minio server /data
-
-volumes:
-  s3_data: null
+networks:
+  local-dev:
+    external: true
