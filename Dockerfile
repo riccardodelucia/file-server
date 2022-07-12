@@ -2,6 +2,11 @@
 
 FROM node:16 as base
 
+ARG ARG_VERSION=latest
+ENV VERSION=$ARG_VERSION
+ARG ARG_BUILD=0
+ENV BUILD=$ARG_BUILD
+
 RUN mkdir -p /usr/share/app
 
 WORKDIR /usr/src/app
@@ -28,14 +33,12 @@ FROM base as prod
 
 ENV NODE_ENV=production
 
-ENV USERNAME=node
-ENV GROUPNAME=node
+ENV USERNAME=fileserver
+ENV GROUPNAME=fileserver
 ENV USERNAME_UID=1001
 ENV GROUPNAME_GID=1001
-RUN groupadd -g ${GROUPNAME_GID} -r ${GROUPNAME} && useradd -l -r -u ${USERNAME_UID} -g ${GROUPNAME} ${USERNAME}
-
-RUN npm install --omit=dev
-
-RUN chmod -R 775 .
+RUN groupadd -g ${GROUPNAME_GID} -r ${GROUPNAME} && useradd -l -r -u ${USERNAME_UID} -g ${GROUPNAME} ${USERNAME} && \
+    chmod -R 775 . && \
+    npm install --omit=dev
 
 USER node

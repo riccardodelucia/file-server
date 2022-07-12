@@ -1,45 +1,96 @@
-# This file is a template, and might need editing before it works on your project.
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/ee/development/cicd/templates.html
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
-
-# This is a sample GitLab CI/CD configuration file that should run without any modifications.
-# It demonstrates a basic 3 stage CI/CD pipeline. Instead of real tests or scripts,
-# it uses echo commands to simulate the pipeline execution.
-#
-# A pipeline is composed of independent jobs that run scripts, grouped into stages.
-# Stages run in sequential order, but jobs within stages run in parallel.
-#
-# For more information, see: https://docs.gitlab.com/ee/ci/yaml/index.html#stages
-
-stages:          # List of stages for jobs, and their order of execution
+stages:
+  - lint
   - build
   - test
   - deploy
 
-build-job:       # This job runs in the build stage, which runs first.
+
+variables:
+  IMAGE_NAME: fileserver
+  BUILD_VERSION: $CI_COMMIT_SHORT_SHA
+
+
+lint hadolint:
+  stage: lint
+  image: hadolint/hadolint:latest-debian
+  script:
+    - hadolint Dockerfile
+
+
+lint javascript:
+  stage: lint
+  image: node
+  script:
+    - npm install -g eslint
+    - eslint --init
+    - eslint src
+
+
+build image:
   stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
   script:
-    - echo "Compiling the code..."
-    - echo "Compile complete."
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - cat $CI_SERVER_TLS_CA_FILE >> /kaniko/ssl/certs/ca-certificates.crt
+    - /kaniko/executor --build-arg ARG_BUILD=$BUILD_VERSION --build-arg ARG_VERSION=${CI_COMMIT_TAG:-latest} --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE/$IMAGE_NAME:$CI_COMMIT_TAG --destination $CI_REGISTRY_IMAGE/$IMAGE_NAME:$BUILD_VERSION --target=prod --skip-unused-stages=true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: always
+    - if: $CI_COMMIT_BRANCH != "main"
+      when: never
 
-unit-test-job:   # This job runs in the test stage.
-  stage: test    # It only starts when the job in the build stage completes successfully.
-  script:
-    - echo "Running unit tests... This will take about 60 seconds."
-    - sleep 60
-    - echo "Code coverage is 90%"
 
-lint-test-job:   # This job also runs in the test stage.
-  stage: test    # It can run at the same time as unit-test-job (in parallel).
-  script:
-    - echo "Linting code... This will take about 10 seconds."
-    - sleep 10
-    - echo "No lint issues found."
 
-deploy-job:      # This job runs in the deploy stage.
-  stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
+test image:
+  stage: test
+  image: curlimages/curl
+  variables:
+    VERSION: latest
+  services:
+    - name: "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$VERSION"
+      alias: server
   script:
-    - echo "Deploying application..."
-    - echo "Application successfully deployed."
+    - curl http://server:8080 | grep $BUILD_VERSION
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        VERSION: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH != "main"
+      when: never
+
+
+.deploy to environment:
+  stage: deploy
+  image: ubuntu
+  before_script:
+      - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
+      - eval $(ssh-agent -s)
+      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      - mkdir -p ~/.ssh
+      - chmod 700 ~/.ssh
+      - ssh-keyscan $VM_NAME >> ~/.ssh/known_hosts
+      - chmod 644 ~/.ssh/known_hosts
+      - apt-get update -y
+      - apt-get install -y gettext
+  script:
+    - envsubst < templates/$ENV_FILE > .env
+    - envsubst < templates/deploy.sh > deploy.sh
+    - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
+    - ssh -l $USER -o StrictHostKeyChecking=no $VM_NAME "mkdir -p $VM_TARGET_DIR"
+    - scp deploy.sh $USER@$VM_NAME:$VM_TARGET_DIR/deploy.sh
+    - scp docker-compose.deploy.yml $USER@$VM_NAME:$VM_TARGET_DIR/docker-compose.yml
+    - scp .env $USER@$VM_NAME:$VM_TARGET_DIR/.env
+    - ssh -l $USER -o StrictHostKeyChecking=no $VM_NAME 'bash -s' < deploy.sh
+
+
+deploy to staging:
+  environment: staging
+  extends: .deploy to environment
+  variables:
+    ENV_FILE: staging.env
+    TAG: latest
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "staging"
