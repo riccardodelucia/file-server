@@ -55,7 +55,7 @@ build image:
     - cat $CI_SERVER_TLS_CA_FILE >> /kaniko/ssl/certs/ca-certificates.crt
     - /kaniko/executor --build-arg ARG_BUILD=$BUILD --build-arg ARG_VERSION=$VERSION --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE/$IMAGE_NAME:$VERSION --destination $CI_REGISTRY_IMAGE/$IMAGE_NAME:$BUILD --target=prod --skip-unused-stages=true
   rules:
-    - if: $CI_REF_NAME == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
       when: always
 
 
@@ -68,7 +68,7 @@ test image:
   script:
     - curl http://server:8080 | grep $BUILD
   rules:
-    - if: $CI_REF_NAME == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
       when: always
 
 
