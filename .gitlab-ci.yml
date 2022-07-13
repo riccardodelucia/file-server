@@ -100,6 +100,8 @@ tag image:
   script:
     - echo $VM_USER
     - echo $VM_NAME
+    - echo $CI_COMMIT_BRANCH
+    - echo $CI_ENVIRONMENT_NAME
     - envsubst < templates/$ENV_FILE > .env
     - envsubst < templates/deploy.sh > deploy.sh
     - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
