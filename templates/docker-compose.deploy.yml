@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   fileserver:
-    image: "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$VERSION"
+    image: "$CI_REGISTRY_IMAGE:$TAG"
     command: [ "npm", "run", "start-prod" ]
     ports:
       - $PORT:8080

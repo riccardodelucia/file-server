@@ -10,7 +10,6 @@ stages:
 variables:
   IMAGE_NAME: fileserver
   BUILD: $CI_COMMIT_SHORT_SHA
-  VERSION: $CI_COMMIT_REF_NAME
 
 ####################################################################################################
 # merge request pipeline: run this job only when a merge request is opened to save pipeline runs
@@ -47,9 +46,9 @@ build image:
    - mkdir -p /kaniko/.docker
    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
    - cat $CI_SERVER_TLS_CA_FILE >> /kaniko/ssl/certs/ca-certificates.crt
-   - /kaniko/executor --build-arg ARG_BUILD=$BUILD --build-arg ARG_VERSION=$VERSION --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE:$BUILD --destination $CI_REGISTRY_IMAGE:latest --target=prod --skip-unused-stages=true
+   - /kaniko/executor --build-arg ARG_BUILD=$BUILD --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE:$BUILD --destination $CI_REGISTRY_IMAGE:latest --target=prod --skip-unused-stages=true
  rules:
-   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
      when: always
    - when: never
 
@@ -63,7 +62,7 @@ test image:
   script:
     - curl http://server:8080 | grep $BUILD
   rules:
-   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
      when: always
    - when: never
 
@@ -86,38 +85,39 @@ tag image:
     - when: never
 
 
-#
-#
-#.deploy to environment:
-#  stage: deploy
-#  image: ubuntu
-#  before_script:
-#      - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
-#      - eval $(ssh-agent -s)
-#      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-#      - mkdir -p ~/.ssh
-#      - chmod 700 ~/.ssh
-#      - ssh-keyscan $VM_NAME >> ~/.ssh/known_hosts
-#      - chmod 644 ~/.ssh/known_hosts
-#      - apt-get update -y
-#      - apt-get install -y gettext
-#  script:
-#    - echo $VERSION
-#    - envsubst < templates/$ENV_FILE > .env
-#    - envsubst < templates/deploy.sh > deploy.sh
-#    - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
-#    - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME "mkdir -p $VM_TARGET_DIR"
-#    - scp deploy.sh $VM_USER@$VM_NAME:$VM_TARGET_DIR/deploy.sh
-#    - scp docker-compose.deploy.yml $VM_USER@$VM_NAME:$VM_TARGET_DIR/docker-compose.yml
-#    - scp .env $VM_USER@$VM_NAME:$VM_TARGET_DIR/.env
-#    - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME 'bash -s' < deploy.sh
-#
-#
-#deploy to staging:
-#  environment: staging
-#  extends: .deploy to environment
-#  variables:
-#    ENV_FILE: staging.env
-#  rules:
-#    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "staging"
+####################################################################################################
+# branch pipeline: deploy to environment
+.deploy to environment:
+  stage: deploy
+  image: ubuntu
+  before_script:
+      - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
+      - eval $(ssh-agent -s)
+      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      - mkdir -p ~/.ssh
+      - chmod 700 ~/.ssh
+      - ssh-keyscan $VM_NAME >> ~/.ssh/known_hosts
+      - chmod 644 ~/.ssh/known_hosts
+      - apt-get update -y
+      - apt-get install -y gettext
+  script:
+    - envsubst < templates/$ENV_FILE > .env
+    - envsubst < templates/deploy.sh > deploy.sh
+    - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
+    - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME "mkdir -p $VM_TARGET_DIR"
+    - scp deploy.sh $VM_USER@$VM_NAME:$VM_TARGET_DIR/deploy.sh
+    - scp docker-compose.deploy.yml $VM_USER@$VM_NAME:$VM_TARGET_DIR/docker-compose.yml
+    - scp .env $VM_USER@$VM_NAME:$VM_TARGET_DIR/.env
+    - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME 'bash -s' < deploy.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
+
+
+deploy to staging:
+  environment: staging
+  extends: .deploy to environment
+  variables:
+    ENV_FILE: staging.env
+    TAG: $BUILD
+
 
