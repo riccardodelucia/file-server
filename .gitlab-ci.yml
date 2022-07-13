@@ -101,6 +101,8 @@ tag image:
       - apt-get update -y
       - apt-get install -y gettext
   script:
+    - echo $VM_USER
+    - echo $VM_NAME
     - envsubst < templates/$ENV_FILE > .env
     - envsubst < templates/deploy.sh > deploy.sh
     - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
