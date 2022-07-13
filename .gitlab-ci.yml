@@ -110,6 +110,8 @@ tag image:
     - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME 'bash -s' < deploy.sh
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
+      when: always
+    - when: never
 
 deploy to staging:
   environment: staging
