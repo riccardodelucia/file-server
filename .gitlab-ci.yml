@@ -109,10 +109,6 @@ tag image:
     - scp docker-compose.deploy.yml $VM_USER@$VM_NAME:$VM_TARGET_DIR/docker-compose.yml
     - scp .env $VM_USER@$VM_NAME:$VM_TARGET_DIR/.env
     - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME 'bash -s' < deploy.sh
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
-      when: always
-    - when: never
 
 deploy to staging:
   environment: staging
@@ -120,3 +116,5 @@ deploy to staging:
   variables:
     ENV_FILE: staging.env
     TAG: $BUILD
+  only:
+    - staging
