@@ -98,7 +98,6 @@ tag image:
     - apt-get update -y
     - apt-get install -y gettext
   script:
-    - echo $VM_USER
     - echo $VM_NAME
     - echo $CI_COMMIT_BRANCH
     - echo $CI_ENVIRONMENT_NAME
