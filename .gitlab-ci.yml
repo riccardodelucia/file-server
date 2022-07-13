@@ -6,7 +6,6 @@ stages:
   - tag
   - deploy
 
-
 variables:
   IMAGE_NAME: fileserver
   BUILD: $CI_COMMIT_SHORT_SHA
@@ -18,14 +17,12 @@ variables:
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
 
-
 lint hadolint:
   extends: .lint
   image: hadolint/hadolint:latest-debian
   script:
     - echo $CI_REGISTRY_IMAGE
     - hadolint Dockerfile
-
 
 lint javascript:
   extends: .lint
@@ -38,20 +35,21 @@ lint javascript:
 ####################################################################################################
 # branch pipeline: build and test image on the master branch
 build image:
- stage: build
- image:
-   name: gcr.io/kaniko-project/executor:debug
-   entrypoint: [""]
- script:
-   - mkdir -p /kaniko/.docker
-   - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-   - cat $CI_SERVER_TLS_CA_FILE >> /kaniko/ssl/certs/ca-certificates.crt
-   - /kaniko/executor --build-arg ARG_BUILD=$BUILD --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE:$BUILD --destination $CI_REGISTRY_IMAGE:latest --target=prod --skip-unused-stages=true
- rules:
-   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
-     when: always
-   - when: never
-
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - cat $CI_SERVER_TLS_CA_FILE >> /kaniko/ssl/certs/ca-certificates.crt
+    - /kaniko/executor --build-arg ARG_BUILD=$BUILD --context $CI_PROJECT_DIR --destination $CI_REGISTRY_IMAGE:$BUILD --destination $CI_REGISTRY_IMAGE:latest --target=prod --skip-unused-stages=true
+  rules:
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
+      when: always
+    - when: never
 
 test image:
   stage: test
@@ -62,10 +60,11 @@ test image:
   script:
     - curl http://server:8080 | grep $BUILD
   rules:
-   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
-     when: always
-   - when: never
-
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH # excludes execution when tagging the commit
+      when: always
+    - when: never
 
 ####################################################################################################
 # tag pipeline: tag image with git tag
@@ -84,22 +83,21 @@ tag image:
       when: always
     - when: never
 
-
 ####################################################################################################
 # branch pipeline: deploy to environment
 .deploy to environment:
   stage: deploy
   image: ubuntu
   before_script:
-      - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
-      - eval $(ssh-agent -s)
-      - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-      - mkdir -p ~/.ssh
-      - chmod 700 ~/.ssh
-      - ssh-keyscan $VM_NAME >> ~/.ssh/known_hosts
-      - chmod 644 ~/.ssh/known_hosts
-      - apt-get update -y
-      - apt-get install -y gettext
+    - "command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )"
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $VM_NAME >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - apt-get update -y
+    - apt-get install -y gettext
   script:
     - echo $VM_USER
     - echo $VM_NAME
@@ -114,12 +112,9 @@ tag image:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
 
-
 deploy to staging:
   environment: staging
   extends: .deploy to environment
   variables:
     ENV_FILE: staging.env
     TAG: $BUILD
-
-
