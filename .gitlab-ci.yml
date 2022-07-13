@@ -16,8 +16,8 @@ variables:
 # merge request pipeline: run this job only when a merge request is opened to save pipeline runs
 .lint:
   stage: lint
-  #rules:
-    #- if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
 
 
 lint hadolint:
