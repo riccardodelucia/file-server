@@ -116,5 +116,6 @@ deploy to staging:
   variables:
     ENV_FILE: staging.env
     TAG: $BUILD
+    TEST: none
   only:
     - staging
