@@ -7,7 +7,6 @@ stages:
   - deploy
 
 variables:
-  IMAGE_NAME: fileserver
   BUILD: $CI_COMMIT_SHORT_SHA
 
 ####################################################################################################
