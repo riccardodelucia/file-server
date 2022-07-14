@@ -25,6 +25,11 @@ const uploadStatus = {
 const environment = process.env.NODE_ENV;
 const build = process.env.BUILD;
 const version = process.env.VERSION;
+const corsOrigins = process.env.CORS_ORIGINS || '';
+const corsMethods = process.env.CORS_METHODS || '';
+
+console.log('corsOrigins: ', corsOrigins);
+console.log('corsMethods: ', corsMethods);
 
 // App
 const app = express();
@@ -38,8 +43,8 @@ if (environment === 'development') {
   app.use(morgan('tiny'));
   app.use(
     cors({
-      origin: 'https://iorio-apps.fht.org',
-      methods: 'POST',
+      origin: corsOrigins,
+      methods: corsMethods,
       preflightContinue: false,
       optionsSuccessStatus: 204,
     })
