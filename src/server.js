@@ -30,8 +30,8 @@ const uploadStatus = {
 const environment = process.env.NODE_ENV;
 const build = process.env.BUILD;
 const version = process.env.VERSION;
-const corsOrigins = process.env.CORS_ORIGINS || '';
-const corsMethods = process.env.CORS_METHODS || '';
+const corsOrigins = process.env?.CORS_ORIGINS_FILESERVER.split(', ') || '';
+const corsMethods = process.env?.CORS_METHODS_FILESERVER.split(', ') || '';
 
 // App
 const app = express();
@@ -49,8 +49,6 @@ if (environment === 'development') {
     cors({
       origin: corsOrigins,
       methods: corsMethods,
-      preflightContinue: false,
-      optionsSuccessStatus: 204,
     })
   );
 } else throw new Error(`Wrong ENV_VAR value: ${environment}`);
