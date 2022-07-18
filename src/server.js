@@ -30,8 +30,8 @@ const uploadStatus = {
 const environment = process.env.NODE_ENV;
 const build = process.env.BUILD;
 const version = process.env.VERSION;
-const corsOrigins = process.env?.CORS_ORIGINS_FILESERVER.split(', ') || '';
-const corsMethods = process.env?.CORS_METHODS_FILESERVER.split(', ') || '';
+const corsOrigins = process.env.CORS_ORIGINS_FILESERVER?.split(', ') || '';
+const corsMethods = process.env.CORS_METHODS_FILESERVER?.split(', ') || '';
 
 // App
 const app = express();
