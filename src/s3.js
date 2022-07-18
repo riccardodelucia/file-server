@@ -42,7 +42,7 @@ async function multipartUpload(file, objectKey) {
     Key: objectKey,
   };
 
-  const parallelUploads3 = new Upload({
+  const parallelUploads = new Upload({
     client: s3Client,
     params: uploadParams,
     tags: [], // optional tags
@@ -51,13 +51,13 @@ async function multipartUpload(file, objectKey) {
     leavePartsOnError: false, // optional manually handle dropped parts
   });
 
-  parallelUploads3.on('httpUploadProgress', (progress) => {
-    logger.info(progress);
+  parallelUploads.on('httpUploadProgress', (progress) => {
+    if (progress.part % 100 === 0 || progress.part === 1) logger.info(progress);
   });
 
   logger.info(`Upload complete for ${objectKey} object`);
 
-  return parallelUploads3.done();
+  return parallelUploads.done();
 }
 
 exports.multipartUpload = multipartUpload;
