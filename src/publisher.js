@@ -1,6 +1,12 @@
 const Redis = require('ioredis');
+const winston = require('winston');
 
+const logger = winston.createLogger({
+  transports: [new winston.transports.Console()],
+});
 const publisher = process.env.PUBLISHER || false;
+
+logger.info(`Publisher configured: ${publisher}`);
 
 let publish;
 
@@ -9,12 +15,14 @@ let publish;
  */
 
 if (publisher) {
+  logger.info(`Setting up redis client: ${publisher}`);
+
   const redis = new Redis({
     host: 'redis',
     port: 6379,
     connectTimeout: 10000,
     retryStrategy(times) {
-      console.log('retry: ', times);
+      logger.info('Redis client setup retry: ', times);
       const delay = Math.min(times * 50, 20000);
       return delay;
     },
@@ -27,6 +35,9 @@ if (publisher) {
     objectKey = '',
     info = undefined
   ) => {
+    logger.info(
+      `Publish message: file ${filename} with object key ${objectKey} upload ended with status ${status}`
+    );
     const uploadArray = [
       'status',
       status,
@@ -44,7 +55,7 @@ if (publisher) {
   };
 } else {
   publish = () => {
-    console.log('Publisher disabled');
+    logger.info('No message published: publisher disabled');
   };
 }
 

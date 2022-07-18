@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const winston = require('winston');
 const rateLimit = require('express-rate-limit');
 const xss = require('xss-clean');
 const hpp = require('hpp');
@@ -12,6 +13,10 @@ const { default: PQueue } = require('p-queue');
 const { multipartUpload } = require('./s3');
 
 const { publish } = require('./publisher');
+
+const logger = winston.createLogger({
+  transports: [new winston.transports.Console()],
+});
 
 // Constants
 const PORT = 8080;
@@ -28,19 +33,18 @@ const version = process.env.VERSION;
 const corsOrigins = process.env.CORS_ORIGINS || '';
 const corsMethods = process.env.CORS_METHODS || '';
 
-console.log('corsOrigins: ', corsOrigins);
-console.log('corsMethods: ', corsMethods);
-
 // App
 const app = express();
 
 app.enable('trust proxy');
 
 if (environment === 'development') {
+  logger.info('DEV environment');
   app.use(morgan('dev'));
   app.use(cors());
 } else if (environment === 'production') {
-  app.use(morgan('tiny'));
+  logger.info('PROD environment');
+  app.use(morgan('combined'));
   app.use(
     cors({
       origin: corsOrigins,
@@ -88,6 +92,8 @@ app.post('/upload', async (req, res) => {
   const workQueue = new PQueue({ concurrency: 1 });
 
   async function abort(e, code = 500) {
+    logger.warning(`Aborting connection`);
+
     req.unpipe(busboy);
     workQueue.pause();
     try {
@@ -149,4 +155,4 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, HOST);
-console.log(`Running on http://${HOST}:${PORT}`);
+logger.info(`Running on http://${HOST}:${PORT}`);
