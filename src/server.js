@@ -90,7 +90,7 @@ app.post('/upload', async (req, res) => {
   const workQueue = new PQueue({ concurrency: 1 });
 
   async function abort(e, code = 500) {
-    logger.warning(`Aborting connection`);
+    logger.warn(`Aborting connection`);
 
     req.unpipe(busboy);
     workQueue.pause();

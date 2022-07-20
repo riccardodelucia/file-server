@@ -4,7 +4,7 @@ const winston = require('winston');
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
-const publisher = process.env.PUBLISHER || false;
+const publisher = process.env.PUBLISHER === 'true';
 
 logger.info(`Publisher configured: ${publisher}`);
 
