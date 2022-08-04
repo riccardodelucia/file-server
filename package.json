@@ -18,6 +18,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.121.0",
     "@aws-sdk/lib-storage": "^3.121.0",
+    "axios": "^0.27.2",
     "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.1",
@@ -26,7 +27,9 @@
     "helmet": "^5.1.0",
     "hpp": "^0.2.3",
     "ioredis": "^5.1.0",
+    "jose": "^4.8.3",
     "morgan": "^1.10.0",
+    "node-cache": "^5.1.2",
     "nodemon": "^2.0.18",
     "p-queue": "^6.6.2",
     "winston": "^3.8.1",

@@ -1,4 +1,4 @@
-require('dotenv').config();
+//require('dotenv').config();
 const winston = require('winston');
 
 const { S3Client, CreateBucketCommand } = require('@aws-sdk/client-s3');
