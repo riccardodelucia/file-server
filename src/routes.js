@@ -7,6 +7,6 @@ const router = express.Router({ mergeParams: true });
 
 router.use(authController.protect);
 
-router.post('/upload', uploadController.uploadFile);
+router.post('/', uploadController.uploadFile);
 
 module.exports = router;

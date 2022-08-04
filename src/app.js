@@ -65,7 +65,7 @@ app.delete('/upload', (req, res) => {
 });
 
 // Routes
-app.use('/', router);
+app.use('/upload', router);
 
 app.get('/', (req, res) => {
   res.json({ build, version });
