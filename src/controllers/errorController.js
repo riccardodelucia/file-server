@@ -1,4 +1,5 @@
 const winston = require('winston');
+const AppError = require('../utils/appError');
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -29,14 +30,28 @@ const sendErrorProd = (err, res) => {
   }
 };
 
+const handleTokenExpiredError = () => {
+  return new AppError('Token expired', 403);
+};
+
+const handleTokenInvalidClaimError = (error) => {
+  return new AppError(
+    `Invalid Token Claim. Wrong claims: '${error.claim}'`,
+    403
+  );
+};
+
 /* eslint-disable */
 module.exports = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
-
+  let error = { ...err };
+  error.statusCode = err.statusCode || 500;
+  error.status = err.status || 'error';
+  if (error.name === 'JWTExpired') error = handleTokenExpiredError();
+  if (error.name === 'JWTClaimValidationFailed')
+    error = handleTokenInvalidClaimError(error);
   if (process.env.NODE_ENV === 'development') {
-    sendErrorDev(err, res);
+    sendErrorDev(error, res);
   } else if (process.env.NODE_ENV === 'production') {
-    sendErrorProd(err, res);
+    sendErrorProd(error, res);
   }
 };
