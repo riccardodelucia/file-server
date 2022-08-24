@@ -46,6 +46,7 @@ module.exports = (err, req, res, next) => {
   let error = { ...err };
   error.statusCode = err.statusCode || 500;
   error.status = err.status || 'error';
+  if (req.url.includes('upload')) res.header('Connection', 'close'); //this automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
   if (error.name === 'JWTExpired') error = handleTokenExpiredError();
   if (error.name === 'JWTClaimValidationFailed')
     error = handleTokenInvalidClaimError(error);

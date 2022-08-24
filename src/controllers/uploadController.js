@@ -15,13 +15,20 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-exports.uploadFile = async (req, res, next) => {
+exports.checkUploadId = (req, res, next) => {
   const uploadId = req.headers['x-upload-id'];
 
   if (!uploadId) {
     logger.warn('Missing Upload Id');
-    return next(new AppError('Missing "X-Upload-Id" header', 400)); //res.status(400).json({ message: 'Missing "X-Upload-Id" header' });
+    return next(new AppError('Missing "X-Upload-Id" header', 400));
   }
+
+  res.locals.uploadId = uploadId;
+  next();
+};
+
+exports.uploadFile = async (req, res) => {
+  const uploadId = res.locals.uploadId;
 
   // check: https://stackoverflow.com/questions/63632422/express-js-how-handle-errors-with-busboy
 

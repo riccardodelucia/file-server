@@ -60,10 +60,6 @@ app.use(xss());
 
 app.use(hpp()); //no query parameters allowed so far
 
-app.delete('/upload', (req, res) => {
-  res.status(204);
-});
-
 // Routes
 app.use('/upload', router);
 
