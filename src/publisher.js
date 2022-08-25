@@ -1,6 +1,11 @@
 const Redis = require('ioredis');
 const winston = require('winston');
 
+exports.messageStatus = {
+  UPLOADED: 'uploaded',
+  ERROR: 'error',
+};
+
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
@@ -11,7 +16,7 @@ logger.info(`Publisher configured: ${publisher}`);
 let publish;
 
 /**
- * This module implements a dependency-injection system for defining the publish method, according to the actual need for publishing messages to a subscribed service. If there is no need for informing other services about the outcome of an upload endpoint (i.e. the server is only used to upload random files to an s3 bucket), the publish method simply prints a message and returns
+ * This module implements a dependency-injection system for defining the publish method, according to the actual need for publishing messages to a subscribed service.  * If there is no need for informing other services about the outcome of an upload endpoint (i.e. the server is only used to upload random files to an s3 bucket), the  * publish method simply prints a message and returns
  */
 
 if (publisher) {
@@ -28,15 +33,17 @@ if (publisher) {
     },
   });
 
-  publish = async (
-    status,
-    uploadId,
-    filename,
-    objectKey = '',
-    info = undefined
-  ) => {
+  /**
+   * This publisher simply sends all info it has when it's called. This info can highly vary according to where and why this is called
+   * e.g because of an error/ successfull upload, etc.
+   * It is up to the subscriber to parse the message and react accordingly to available information
+   * Note: it is better to leave publish as a fire-and-forget action in order not to block replies to clients.
+   * Should any error occur during publishing, a logger message is printed and the message is unfortunately lost before reaching the subscriber
+   */
+  publish = ({ status, uploadId, filename, objectKey, info = {} }) => {
+    const stringifiedInfo = JSON.stringify(info);
     logger.info(
-      `Publish message: file ${filename} with object key ${objectKey} upload ended with status ${status}`
+      `Publish message: status ${status} | uploadId ${uploadId} | filename ${filename} | objectKey ${objectKey} | info ${stringifiedInfo}`
     );
     const uploadArray = [
       'status',
@@ -48,10 +55,11 @@ if (publisher) {
       'objectKey',
       objectKey,
       'info',
-      JSON.stringify(info),
+      stringifiedInfo,
     ];
-
-    await redis.xadd('ccr', '*', ...uploadArray);
+    redis.xadd('ccr', '*', ...uploadArray).catch((err) => {
+      logger.error(`Error while trying to publish message: ${err.message}`);
+    });
   };
 } else {
   publish = () => {

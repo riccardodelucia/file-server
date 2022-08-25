@@ -15,7 +15,7 @@ const x509Cache = new NodeCache({ stdTTL: 60, checkperiod: 70 });
 
 const audience = process.env.AUTH_TOKEN_AUDIENCE;
 
-exports.protect = catchAsync(async (req, res, next) => {
+const retrieveX509Certificate = async () => {
   let x509 = x509Cache.get('x509');
   if (x509 == undefined) {
     const res = await axios.get(authJWKSUri);
@@ -26,8 +26,11 @@ exports.protect = catchAsync(async (req, res, next) => {
 
     x509Cache.set('x509', x509);
   }
-  const publicKey = await jose.importX509(x509.cert, x509.alg);
 
+  return x509;
+};
+
+const getTokenFromRequestHeader = (req, next) => {
   let jwt;
 
   if (
@@ -38,8 +41,21 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   if (!jwt) {
-    return next(new AppError('No valid token in the Request Header', 403));
+    next(new AppError('No valid token in the Request Header', 401));
   }
+
+  return jwt;
+};
+
+const getPublicKey = async () => {
+  const x509 = await retrieveX509Certificate();
+  return jose.importX509(x509.cert, x509.alg);
+};
+
+exports.protect = catchAsync(async (req, res, next) => {
+  const jwt = getTokenFromRequestHeader(req, next);
+
+  const publicKey = await getPublicKey();
 
   const { payload } = await jose.jwtVerify(jwt, publicKey, {
     audience,

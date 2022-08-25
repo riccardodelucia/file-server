@@ -2,14 +2,11 @@ const Busboy = require('busboy');
 const { default: PQueue } = require('p-queue');
 const winston = require('winston');
 
-const { publish } = require('../publisher');
+const { publish, messageStatus } = require('../publisher');
 const { multipartUpload } = require('../s3');
 const AppError = require('../utils/appError');
 
-const uploadStatus = {
-  UPLOADED: 'uploaded',
-  ERROR: 'error',
-};
+const catchAsync = require('../utils/catchAsync');
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -27,11 +24,8 @@ exports.checkUploadId = (req, res, next) => {
   next();
 };
 
-exports.uploadFile = async (req, res) => {
+exports.uploadFile = async (req, res, next) => {
   const uploadId = res.locals.uploadId;
-
-  // check: https://stackoverflow.com/questions/63632422/express-js-how-handle-errors-with-busboy
-
   const info = {};
   let filename = undefined;
   let objectKey = undefined;
@@ -39,61 +33,73 @@ exports.uploadFile = async (req, res) => {
   const busboy = Busboy({ headers: req.headers });
   const workQueue = new PQueue({ concurrency: 1 });
 
-  async function abort(e, code = 500) {
-    logger.warn(`Aborting connection`);
-
-    req.unpipe(busboy);
-    workQueue.pause();
-    try {
-      await publish(uploadStatus.ERROR, uploadId, filename, objectKey, info);
-    } catch (error) {
-      logger.error('Unable to send message to the subscriber: ', error);
-    } finally {
-      res.status(code);
-      res.send(e?.message);
-    }
-  }
-
-  async function handleError(fn) {
-    workQueue.add(async () => {
-      try {
-        await fn();
-      } catch (e) {
-        await abort(e);
-      }
-    });
-  }
-
   busboy.on('file', (_, file, fileInfo) => {
-    handleError(async () => {
-      filename = fileInfo.filename;
-      const date = String(Date.now());
-      objectKey = [uploadId, date, filename].join('/');
-      await multipartUpload(file, objectKey);
-    });
+    workQueue.add(
+      catchAsync(async () => {
+        filename = fileInfo.filename;
+        res.locals.filename = filename;
+        const date = String(Date.now());
+        objectKey = [uploadId, date, filename].join('/');
+        res.locals.objectKey = objectKey;
+        await multipartUpload(file, objectKey);
+      })
+    );
   });
 
   busboy.on('field', (name, val) => {
-    handleError(async () => {
-      // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
-      info[name] = val;
-    });
+    workQueue.add(
+      catchAsync(async () => {
+        // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
+        info[name] = val;
+      })
+    );
   });
 
   busboy.on('finish', async () => {
-    handleError(async () => {
-      await publish(uploadStatus.UPLOADED, uploadId, filename, objectKey, info);
-      res.sendStatus(200);
-    });
+    next();
   });
 
   req.on('aborted', () => {
-    abort(new Error('Connection aborted'), 499);
+    next(new Error('Connection aborted'), 499);
   });
 
-  busboy.on('error', (e) => {
-    abort(e);
+  busboy.on('error', (err) => {
+    next(err);
   });
+
+  res.locals.busboy = busboy;
+  res.locals.workQueue = workQueue;
+
+  res.locals.info = info;
 
   req.pipe(busboy);
+};
+
+exports.finalizeSuccessfullUpload = (req, res) => {
+  const uploadId = res.locals.uploadId;
+  const filename = res.locals.filename;
+  const objectKey = res.locals.objectKey;
+  const info = res.locals.info;
+
+  publish({
+    status: messageStatus.UPLOADED,
+    uploadId,
+    filename,
+    objectKey,
+    info,
+  });
+  res.sendStatus(200);
+};
+
+exports.abort = (err, req, res, next) => {
+  const busboy = res.locals.busboy;
+  const workQueue = res.locals.workQueue;
+
+  if (busboy && workQueue) {
+    logger.warn(`Pending upload: aborting connection`);
+    req.unpipe(busboy);
+    workQueue.pause();
+  }
+
+  next(err);
 };

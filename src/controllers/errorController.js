@@ -1,5 +1,6 @@
 const winston = require('winston');
 const AppError = require('../utils/appError');
+const { publish, messageStatus } = require('../publisher');
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -41,15 +42,41 @@ const handleTokenInvalidClaimError = (error) => {
   );
 };
 
-/* eslint-disable */
-module.exports = (err, req, res, next) => {
+exports.publishErrorMsg = (err, req, res, next) => {
+  const uploadId = res.locals.uploadId;
+  const filename = res.locals.filename;
+  const objectKey = res.locals.objectKey;
+  const info = res.locals.info || {};
+  publish({
+    status: messageStatus.ERROR,
+    uploadId,
+    filename,
+    objectKey,
+    info,
+  });
+  next(err);
+};
+
+exports.closeConnectionOnError = (err, req, res, next) => {
+  //this instruction automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
+  res.header('Connection', 'close');
+  next(err);
+};
+
+/**
+ * General error handler to respond upon any error occurred during a request processing
+ * Critical error fields (like stack trace) are filtered by sending back a derived object from the exception with desired fields only
+ */
+// eslint-disable-next-line no-unused-vars
+exports.globalErrorMiddleware = (err, req, res, _) => {
   let error = { ...err };
   error.statusCode = err.statusCode || 500;
   error.status = err.status || 'error';
-  if (req.url.includes('upload')) res.header('Connection', 'close'); //this automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
+
   if (error.name === 'JWTExpired') error = handleTokenExpiredError();
   if (error.name === 'JWTClaimValidationFailed')
     error = handleTokenInvalidClaimError(error);
+
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(error, res);
   } else if (process.env.NODE_ENV === 'production') {

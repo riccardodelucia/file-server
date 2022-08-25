@@ -8,8 +8,11 @@ const rateLimit = require('express-rate-limit');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 
-const router = require('./routes');
-const globalErrorHandler = require('./controllers/errorController');
+const uploadRouter = require('./routes/uploadRouter');
+const {
+  globalErrorMiddleware,
+  closeConnectionOnError,
+} = require('./controllers/errorController');
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -61,14 +64,13 @@ app.use(xss());
 app.use(hpp()); //no query parameters allowed so far
 
 // Routes
-app.use('/upload', router);
+app.use('/upload', uploadRouter);
 
 app.get('/', (req, res) => {
   res.json({ build, version });
 });
 
-// General error handler to respond upon any error occurred during a request processing
-// Crytical error fields (like stack trace) are filtered by sending back a derived object from the exception with desired fields only
-app.use(globalErrorHandler);
+app.use(closeConnectionOnError);
+app.use(globalErrorMiddleware);
 
 module.exports = app;
