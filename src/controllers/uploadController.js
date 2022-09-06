@@ -14,6 +14,7 @@ const logger = winston.createLogger({
 
 exports.checkUploadId = (req, res, next) => {
   const uploadId = req.headers['x-upload-id'];
+  logger.info(`uploadId: ${uploadId}`);
 
   if (!uploadId) {
     logger.warn('Missing Upload Id');
@@ -24,7 +25,8 @@ exports.checkUploadId = (req, res, next) => {
   next();
 };
 
-exports.uploadFile = async (req, res, next) => {
+exports.uploadFile = (req, res, next) => {
+  logger.info(`uploadFile method`);
   const uploadId = res.locals.uploadId;
   const info = {};
   let filename = undefined;
@@ -41,21 +43,24 @@ exports.uploadFile = async (req, res, next) => {
         const date = String(Date.now());
         objectKey = [uploadId, date, filename].join('/');
         res.locals.objectKey = objectKey;
+        logger.info(
+          `Got file. Filename: ${filename}. Produced object key: ${objectKey}`
+        );
         await multipartUpload(file, objectKey);
       })
     );
   });
 
   busboy.on('field', (name, val) => {
-    workQueue.add(
-      catchAsync(async () => {
-        // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
-        info[name] = val;
-      })
-    );
+    workQueue.add(() => {
+      logger.info(`Got field. Name: ${name}. Value: ${val}.`);
+      // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
+      info[name] = val;
+    });
   });
 
-  busboy.on('finish', async () => {
+  busboy.on('finish', () => {
+    logger.info(`Finished upload`);
     next();
   });
 

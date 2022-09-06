@@ -43,6 +43,7 @@ const handleTokenInvalidClaimError = (error) => {
 };
 
 exports.publishErrorMsg = (err, req, res, next) => {
+  logger.error(`Publishing error message`);
   const uploadId = res.locals.uploadId;
   const filename = res.locals.filename;
   const objectKey = res.locals.objectKey;
@@ -69,6 +70,7 @@ exports.closeConnectionOnError = (err, req, res, next) => {
  */
 // eslint-disable-next-line no-unused-vars
 exports.globalErrorMiddleware = (err, req, res, _) => {
+  logger.error(`Got error: ${err}`);
   let error = { ...err };
   error.statusCode = err.statusCode || 500;
   error.status = err.status || 'error';
