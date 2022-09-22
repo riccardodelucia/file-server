@@ -40,22 +40,21 @@ if (publisher) {
    * Note: it is better to leave publish as a fire-and-forget action in order not to block replies to clients.
    * Should any error occur during publishing, a logger message is printed and the message is unfortunately lost before reaching the subscriber
    */
-  publish = ({ status, uploadId, filename, objectKey, info = {} }) => {
-    const stringifiedInfo = JSON.stringify(info);
+  publish = ({ status, uploadId, fileId, filename, objectKey }) => {
     logger.info(
-      `Publish message: status ${status} | uploadId ${uploadId} | filename ${filename} | objectKey ${objectKey} | info ${stringifiedInfo}`
+      `Publish message: status ${status} | uploadId: ${uploadId} | fileId: ${fileId} | filename: ${filename} | objectKey: ${objectKey}`
     );
     const uploadArray = [
       'status',
       status,
       'uploadId',
       uploadId,
+      'fileId',
+      fileId,
       'filename',
       filename,
       'objectKey',
       objectKey,
-      'info',
-      stringifiedInfo,
     ];
     redis.xadd('ccr', '*', ...uploadArray).catch((err) => {
       logger.error(`Error while trying to publish message: ${err.message}`);

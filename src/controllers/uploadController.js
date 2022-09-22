@@ -25,10 +25,23 @@ exports.checkUploadId = (req, res, next) => {
   next();
 };
 
+exports.checkFileId = (req, res, next) => {
+  const fileId = req.headers['x-file-id'];
+  logger.info(`fileId: ${fileId}`);
+
+  if (!fileId) {
+    logger.warn('Missing File Id');
+    return next(new AppError('Missing "X-File-Id" header', 400));
+  }
+
+  res.locals.fileId = fileId;
+  next();
+};
+
 exports.uploadFile = (req, res, next) => {
   logger.info(`uploadFile method`);
   const uploadId = res.locals.uploadId;
-  const info = {};
+  const fileId = res.locals.fileId;
   let filename = undefined;
   let objectKey = undefined;
 
@@ -40,8 +53,7 @@ exports.uploadFile = (req, res, next) => {
       catchAsync(async () => {
         filename = fileInfo.filename;
         res.locals.filename = filename;
-        const date = String(Date.now());
-        objectKey = [uploadId, date, filename].join('/');
+        objectKey = [uploadId, fileId, filename].join('/');
         res.locals.objectKey = objectKey;
         logger.info(
           `Got file. Filename: ${filename}. Produced object key: ${objectKey}`
@@ -49,14 +61,6 @@ exports.uploadFile = (req, res, next) => {
         await multipartUpload(file, objectKey);
       })
     );
-  });
-
-  busboy.on('field', (name, val) => {
-    workQueue.add(() => {
-      logger.info(`Got field. Name: ${name}. Value: ${val}.`);
-      // storing all form fields inside an info object allows to avoid clashes with publisher reserved message fields
-      info[name] = val;
-    });
   });
 
   busboy.on('finish', () => {
@@ -75,23 +79,21 @@ exports.uploadFile = (req, res, next) => {
   res.locals.busboy = busboy;
   res.locals.workQueue = workQueue;
 
-  res.locals.info = info;
-
   req.pipe(busboy);
 };
 
 exports.finalizeSuccessfullUpload = (req, res) => {
   const uploadId = res.locals.uploadId;
+  const fileId = res.locals.fileId;
   const filename = res.locals.filename;
   const objectKey = res.locals.objectKey;
-  const info = res.locals.info;
 
   publish({
     status: messageStatus.UPLOADED,
     uploadId,
+    fileId,
     filename,
     objectKey,
-    info,
   });
   res.sendStatus(200);
 };

@@ -11,6 +11,7 @@ const router = express.Router({ mergeParams: true });
  * (i.e. if protect fails the auth, the publishErrorMsg error middleware needs to know the uploadId to inform back the app correctly)
  */
 router.use(uploadController.checkUploadId);
+router.use(uploadController.checkFileId);
 router.use(authController.protect);
 router.post(
   '/',

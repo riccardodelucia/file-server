@@ -45,15 +45,15 @@ const handleTokenInvalidClaimError = (error) => {
 exports.publishErrorMsg = (err, req, res, next) => {
   logger.error(`Publishing error message`);
   const uploadId = res.locals.uploadId;
+  const fileId = res.locals.fileId;
   const filename = res.locals.filename;
   const objectKey = res.locals.objectKey;
-  const info = res.locals.info || {};
   publish({
     status: messageStatus.ERROR,
     uploadId,
+    fileId,
     filename,
     objectKey,
-    info,
   });
   next(err);
 };
