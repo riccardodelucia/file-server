@@ -6,7 +6,7 @@ services:
       context: .
       target: build
     image: fileserver
-    command: [ "npm", "run", "debug" ]
+    command: ["npm", "run", "debug"]
     ports:
       - 8889:8080
       - 9229:9229

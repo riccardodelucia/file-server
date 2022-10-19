@@ -1,18 +1,16 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const winston = require('winston');
-const rateLimit = require('express-rate-limit');
-const xss = require('xss-clean');
-const hpp = require('hpp');
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import morgan from 'morgan';
+import winston from 'winston';
+import rateLimit from 'express-rate-limit';
+import xss from 'xss-clean';
+import hpp from 'hpp';
 
-const uploadRouter = require('./routes/uploadRouter');
-const {
-  globalErrorMiddleware,
-  closeConnectionOnError,
-} = require('./controllers/errorController');
+import uploadRouter from './routes/uploadRouter.js';
+import downloadRouter from './routes/downloadRouter.js';
+
+import errorController from './controllers/errorController.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -65,12 +63,13 @@ app.use(hpp()); //no query parameters allowed so far
 
 // Routes
 app.use('/upload', uploadRouter);
+app.use('/download', downloadRouter);
 
 app.get('/', (req, res) => {
   res.json({ build, version });
 });
 
-app.use(closeConnectionOnError);
-app.use(globalErrorMiddleware);
+app.use(errorController.closeConnectionOnError);
+app.use(errorController.globalErrorMiddleware);
 
-module.exports = app;
+export default app;

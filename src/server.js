@@ -1,7 +1,9 @@
-require('dotenv').config();
+import * as dotenv from 'dotenv';
+dotenv.config();
 
-const winston = require('winston');
-const app = require('./app');
+//const winston = require('winston');
+import winston from 'winston';
+import app from './app.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],

@@ -1,7 +1,7 @@
-const Redis = require('ioredis');
-const winston = require('winston');
+import Redis from 'ioredis';
+import winston from 'winston';
 
-exports.messageStatus = {
+export const messageStatus = {
   UPLOADED: 'uploaded',
   ERROR: 'error',
 };
@@ -13,7 +13,7 @@ const publisher = process.env.PUBLISHER === 'true';
 
 logger.info(`Publisher configured: ${publisher}`);
 
-let publish;
+export let publish;
 
 /**
  * This module implements a dependency-injection system for defining the publish method, according to the actual need for publishing messages to a subscribed service.  * If there is no need for informing other services about the outcome of an upload endpoint (i.e. the server is only used to upload random files to an s3 bucket), the  * publish method simply prints a message and returns
@@ -65,5 +65,3 @@ if (publisher) {
     logger.info('No message published: publisher disabled');
   };
 }
-
-exports.publish = publish;

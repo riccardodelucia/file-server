@@ -1,8 +1,10 @@
-//require('dotenv').config();
-const winston = require('winston');
-
-const { S3Client, CreateBucketCommand } = require('@aws-sdk/client-s3');
-const { Upload } = require('@aws-sdk/lib-storage');
+import winston from 'winston';
+import {
+  S3Client,
+  CreateBucketCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 
 const bucketName = process.env.S3_BUCKET_NAME;
 const bucketEndpoint = process.env.S3_ENDPOINT_URL;
@@ -33,7 +35,7 @@ const s3Client = new S3Client({
   }
 })();
 
-function multipartUpload(file, objectKey) {
+export const multipartUpload = (file, objectKey) => {
   logger.info(`Uploading ${objectKey} object`);
   const uploadParams = {
     Bucket: bucketName,
@@ -55,6 +57,16 @@ function multipartUpload(file, objectKey) {
   });
 
   return parallelUploads.done();
-}
+};
+export const download = (objectKey) => {
+  logger.info(`Streaming ${objectKey} object to client`);
 
-exports.multipartUpload = multipartUpload;
+  const downloadParams = {
+    Bucket: bucketName,
+    Key: objectKey,
+  };
+
+  const command = new GetObjectCommand(downloadParams);
+
+  return s3Client.send(command);
+};

@@ -1,6 +1,6 @@
-const winston = require('winston');
-const AppError = require('../utils/appError');
-const { publish, messageStatus } = require('../publisher');
+import winston from 'winston';
+import { AppError } from '../utils/appError.js';
+import { publish, messageStatus } from '../publisher.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -42,46 +42,41 @@ const handleTokenInvalidClaimError = (error) => {
   );
 };
 
-exports.publishErrorMsg = (err, req, res, next) => {
-  logger.error(`Publishing error message`);
-  const uploadId = res.locals.uploadId;
-  const fileId = res.locals.fileId;
-  const filename = res.locals.filename;
-  const objectKey = res.locals.objectKey;
-  publish({
-    status: messageStatus.ERROR,
-    uploadId,
-    fileId,
-    filename,
-    objectKey,
-  });
-  next(err);
-};
+export default {
+  globalErrorMiddleware: (err, req, res) => {
+    logger.error(`Got error: ${err}`);
+    let error = { ...err };
+    error.statusCode = err.statusCode || 500;
+    error.status = err.status || 'error';
 
-exports.closeConnectionOnError = (err, req, res, next) => {
-  //this instruction automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
-  res.header('Connection', 'close');
-  next(err);
-};
+    if (error.name === 'JWTExpired') error = handleTokenExpiredError();
+    if (error.name === 'JWTClaimValidationFailed')
+      error = handleTokenInvalidClaimError(error);
 
-/**
- * General error handler to respond upon any error occurred during a request processing
- * Critical error fields (like stack trace) are filtered by sending back a derived object from the exception with desired fields only
- */
-// eslint-disable-next-line no-unused-vars
-exports.globalErrorMiddleware = (err, req, res, _) => {
-  logger.error(`Got error: ${err}`);
-  let error = { ...err };
-  error.statusCode = err.statusCode || 500;
-  error.status = err.status || 'error';
-
-  if (error.name === 'JWTExpired') error = handleTokenExpiredError();
-  if (error.name === 'JWTClaimValidationFailed')
-    error = handleTokenInvalidClaimError(error);
-
-  if (process.env.NODE_ENV === 'development') {
-    sendErrorDev(error, res);
-  } else if (process.env.NODE_ENV === 'production') {
-    sendErrorProd(error, res);
-  }
+    if (process.env.NODE_ENV === 'development') {
+      sendErrorDev(error, res);
+    } else if (process.env.NODE_ENV === 'production') {
+      sendErrorProd(error, res);
+    }
+  },
+  closeConnectionOnError: (err, req, res, next) => {
+    //this instruction automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
+    res.header('Connection', 'close');
+    next(err);
+  },
+  publishErrorMsg: (err, req, res, next) => {
+    logger.error(`Publishing error message`);
+    const uploadId = res.locals.uploadId;
+    const fileId = res.locals.fileId;
+    const filename = res.locals.filename;
+    const objectKey = res.locals.objectKey;
+    publish({
+      status: messageStatus.ERROR,
+      uploadId,
+      fileId,
+      filename,
+      objectKey,
+    });
+    next(err);
+  },
 };

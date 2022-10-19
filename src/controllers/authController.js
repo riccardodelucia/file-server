@@ -1,9 +1,10 @@
-const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/appError');
-const jose = require('jose');
-const NodeCache = require('node-cache');
-const axios = require('axios');
-const winston = require('winston');
+import { catchAsync } from '../utils/catchAsync.js';
+
+import { AppError } from '../utils/appError.js';
+import * as jose from 'jose';
+import NodeCache from 'node-cache';
+import axios from 'axios';
+import winston from 'winston';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -34,7 +35,7 @@ const retrieveX509Certificate = async () => {
   return x509;
 };
 
-const getTokenFromRequestHeader = (req, next) => {
+const getTokenFromRequestHeader = (req) => {
   logger.info(`Protect middleware: getting token from request`);
 
   let jwt;
@@ -47,7 +48,7 @@ const getTokenFromRequestHeader = (req, next) => {
   }
 
   if (!jwt) {
-    next(new AppError('No valid token in the Request Header', 401));
+    throw new AppError('No valid token in the Request Header', 401);
   }
 
   logger.info(`Protect middleware: token retrieved`);
@@ -61,20 +62,23 @@ const getPublicKey = async () => {
   return jose.importX509(x509.cert, x509.alg);
 };
 
-exports.protect = catchAsync(async (req, res, next) => {
-  logger.info(`Protect middleware called`);
+// TODO split into subsequent middlewwares
+export default {
+  protect: catchAsync(async (req, res, next) => {
+    logger.info(`Protect middleware called`);
 
-  const jwt = getTokenFromRequestHeader(req, next);
+    const jwt = getTokenFromRequestHeader(req, next);
 
-  const publicKey = await getPublicKey();
+    const publicKey = await getPublicKey();
 
-  logger.info(`Verifying token with public key`);
+    logger.info(`Verifying token with public key`);
 
-  const { payload } = await jose.jwtVerify(jwt, publicKey, {
-    audience,
-  });
+    const { payload } = await jose.jwtVerify(jwt, publicKey, {
+      audience,
+    });
 
-  logger.info(`User '${payload?.preferred_username}' authorized`);
+    logger.info(`User '${payload?.preferred_username}' authorized`);
 
-  next();
-});
+    next();
+  }),
+};
