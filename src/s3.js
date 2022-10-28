@@ -3,6 +3,7 @@ import {
   S3Client,
   CreateBucketCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 
@@ -35,13 +36,15 @@ const s3Client = new S3Client({
   }
 })();
 
-export const multipartUpload = (file, objectKey) => {
+export const multipartUpload = async (file, objectKey, user = undefined) => {
   logger.info(`Uploading ${objectKey} object`);
+
   const uploadParams = {
     Bucket: bucketName,
     Body: file,
     Key: objectKey,
   };
+  if (user) uploadParams.Metadata = { user };
 
   const parallelUploads = new Upload({
     client: s3Client,
@@ -69,4 +72,20 @@ export const download = (objectKey) => {
   const command = new GetObjectCommand(downloadParams);
 
   return s3Client.send(command);
+};
+
+export const checkObjectExistence = async (objectKey) => {
+  const commandParams = {
+    Bucket: bucketName,
+    Key: objectKey,
+  };
+  const command = new HeadObjectCommand(commandParams);
+  try {
+    const response = await s3Client.send(command);
+    if (response.$metadata.httpStatusCode === 200) return true;
+    return false;
+  } catch (error) {
+    if (error.name === 'NotFound') return false;
+    throw error;
+  }
 };

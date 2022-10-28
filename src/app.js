@@ -69,7 +69,6 @@ app.get('/', (req, res) => {
   res.json({ build, version });
 });
 
-app.use(errorController.closeConnectionOnError);
 app.use(errorController.globalErrorMiddleware);
 
 export default app;

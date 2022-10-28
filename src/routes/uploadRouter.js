@@ -1,25 +1,55 @@
 import express from 'express';
 import uploadController from '../controllers/uploadController.js';
 import authController from '../controllers/authController.js';
-import errorController from '../controllers/errorController.js';
+import { checkObjectKeyUser } from '../controllers/middleware.js';
 
-const isProtected = process.env.PROTECTED === 'true';
+const PROTECTED = process.env.FILESERVER_PROTECTED === 'true';
+const PUBLISHER = process.env.FILESERVER_PUBLISHER === 'true';
 
 const router = express.Router({ mergeParams: true });
 
-/*
- * Check the upload ID must be put before anything else to make it available to each subsequent stages asap
- * (i.e. if protect fails the auth, the publishErrorMsg error middleware needs to know the uploadId to inform back the app correctly)
- */
-isProtected && router.use(authController.protect);
-router.use(uploadController.checkUploadId);
-router.use(uploadController.checkFileId);
-router.post(
-  '/',
-  uploadController.uploadFile,
-  uploadController.finalizeSuccessfullUpload
-);
-router.use(uploadController.abort);
-router.use(errorController.publishErrorMsg);
+let middlewareChain = [];
+let errorChain = [];
+
+if (PROTECTED) {
+  router.use(authController.protect);
+
+  middlewareChain = middlewareChain.concat([
+    uploadController.checkObjectKey,
+    checkObjectKeyUser,
+    uploadController.validateNewFileUpload,
+    uploadController.uploadFile,
+  ]);
+
+  errorChain = errorChain.concat([
+    uploadController.abort,
+    uploadController.closeConnectionOnError,
+  ]);
+
+  if (PUBLISHER) {
+    middlewareChain.push(uploadController.publishUploadedMsg);
+    errorChain.push(uploadController.publishErrorMsg);
+  }
+
+  middlewareChain.push(uploadController.sendUploadedResponse);
+} else {
+  middlewareChain = middlewareChain.concat([
+    uploadController.checkObjectKey,
+    uploadController.validateNewFileUpload,
+    uploadController.uploadFile,
+  ]);
+  errorChain = errorChain.concat([
+    uploadController.abort,
+    uploadController.closeConnectionOnError,
+  ]);
+
+  if (PUBLISHER) {
+    middlewareChain.push(uploadController.publishUploadedMsg);
+    errorChain.push(uploadController.publishErrorMsg);
+  }
+  middlewareChain.push(uploadController.sendUploadedResponse);
+}
+
+router.post('/', ...middlewareChain, ...errorChain);
 
 export default router;

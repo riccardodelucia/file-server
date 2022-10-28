@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 
 //const winston = require('winston');
@@ -12,6 +13,11 @@ const logger = winston.createLogger({
 // Constants
 const PORT = 8080;
 const HOST = '0.0.0.0';
+const PROTECTED = process.env.FILESERVER_PROTECTED === 'true';
+const PUBLISHER = process.env.FILESERVER_PUBLISHER === 'true';
+
+logger.warn(`Service is protected: ${PROTECTED}`);
+logger.warn(`Service has publisher configured: ${PUBLISHER}`);
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception! Shutting Down...');

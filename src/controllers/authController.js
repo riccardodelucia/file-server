@@ -62,7 +62,6 @@ const getPublicKey = async () => {
   return jose.importX509(x509.cert, x509.alg);
 };
 
-// TODO split into subsequent middlewwares
 export default {
   protect: catchAsync(async (req, res, next) => {
     logger.info(`Protect middleware called`);
@@ -78,6 +77,8 @@ export default {
     });
 
     logger.info(`User '${payload?.preferred_username}' authorized`);
+
+    res.locals.user = payload?.preferred_username || 'user';
 
     next();
   }),

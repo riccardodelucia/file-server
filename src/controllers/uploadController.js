@@ -2,8 +2,8 @@ import Busboy from 'busboy';
 import PQueue from 'p-queue';
 import winston from 'winston';
 
-import { publish, messageStatus } from '../publisher.js';
-import { multipartUpload } from '../s3.js';
+import publisher from '../publisher.js';
+import { multipartUpload, checkObjectExistence } from '../s3.js';
 import { AppError } from '../utils/appError.js';
 
 import { catchAsync } from '../utils/catchAsync.js';
@@ -13,40 +13,35 @@ const logger = winston.createLogger({
 });
 
 export default {
-  checkUploadId: (req, res, next) => {
-    const uploadId = req.headers['x-upload-id'];
-    logger.info(`uploadId: ${uploadId}`);
+  checkObjectKey: (req, res, next) => {
+    logger.info('checkObjectKey called');
+    const objectKey = req.headers['x-object-key'];
+    logger.info(`objectKey: ${objectKey}`);
 
-    if (!uploadId) {
-      logger.warn('Missing Upload Id');
-      throw new AppError('Missing "X-Upload-Id" header', 400);
+    if (!objectKey) {
+      logger.error('Missing Object Key');
+      throw new AppError('Missing "X-Object-Key" header', 400);
     }
-
-    res.locals.uploadId = uploadId;
+    res.locals.objectKey = objectKey;
     next();
   },
-  checkFileId: (req, res, next) => {
-    const fileId = req.headers['x-file-id'];
-    logger.info(`fileId: ${fileId}`);
-
-    if (!fileId) {
-      logger.warn('Missing File Id');
-      throw new AppError('Missing "X-File-Id" header', 400);
-    }
-
-    res.locals.fileId = fileId;
-    next();
-  },
+  validateNewFileUpload: catchAsync(async (req, res, next) => {
+    // we check whether the uploading object key already corresponds to an uploaded object
+    // NOTE: this could have been don by inspecting the db as well. Since the unprotected version of the file server doesn't use a db, the object existence check is done by looking at the S3 bucket content
+    logger.info('validateFileUpload called');
+    const objectKey = res.locals.objectKey;
+    const objectExists = await checkObjectExistence(objectKey);
+    if (objectExists)
+      return next(new AppError(`ObjectKey ${objectKey} already exists`, 403));
+    return next();
+  }),
   uploadFile: (req, res, next) => {
     /**
      * Since Busboy requires a send header of Content-Type: multipart/form-data, I cannot set the uploaded file type from the request.
      * This means the uploaded files on s3 inherit the standard type, which is octet-stream. When downloading files, I cannot retrieve the file type from the s3 downloaded object file. Therefore, I need a specific strategy for inferring the file type in the download controller.
      */
-    logger.info(`uploadFile method`);
-    const uploadId = res.locals.uploadId;
-    const fileId = res.locals.fileId;
-    let filename = undefined;
-    let objectKey = undefined;
+    logger.info(`uploadFile called`);
+    const objectKey = res.locals.objectKey;
 
     const busboy = Busboy({ headers: req.headers });
     const workQueue = new PQueue({ concurrency: 1 });
@@ -54,31 +49,34 @@ export default {
     busboy.on('file', (_, file, fileInfo) => {
       workQueue.add(
         catchAsync(async () => {
-          filename = fileInfo.filename;
+          const filename = fileInfo.filename;
           res.locals.filename = filename;
-          objectKey = [uploadId, fileId, filename].join('/');
-          res.locals.objectKey = objectKey;
-          logger.info(
-            `Got file. Filename: ${filename}. Produced object key: ${objectKey}`
-          );
+          logger.info(`Got file  ${filename}. Object key: ${objectKey}`);
+
+          // The control on filename matching the object key cna be done only at this stage. No dedicated middleware is therefore created for this task
+          const parts = objectKey.split('/');
+          if (parts.at(-1) !== filename)
+            return next(
+              new AppError(
+                `Filename ${filename} doesn't match the object key pattern ${objectKey}`,
+                400
+              )
+            );
+
           await multipartUpload(file, objectKey);
         })
       );
     });
 
     busboy.on('finish', () => {
-      logger.info(`Finished upload`);
-      // in callback pattern we need to explicitly call next or next(err)
       next();
     });
 
     req.on('aborted', () => {
-      // in callback pattern we need to explicitly call next or next(err)
       next(new Error('Connection aborted'), 499);
     });
 
     busboy.on('error', (err) => {
-      // in callback pattern we need to explicitly call next or next(err)
       next(err);
     });
 
@@ -87,22 +85,17 @@ export default {
 
     req.pipe(busboy);
   },
-  finalizeSuccessfullUpload: (req, res) => {
-    const uploadId = res.locals.uploadId;
-    const fileId = res.locals.fileId;
-    const filename = res.locals.filename;
+  sendUploadedResponse: (req, res) => {
     const objectKey = res.locals.objectKey;
-
-    publish({
-      status: messageStatus.UPLOADED,
-      uploadId,
-      fileId,
-      filename,
-      objectKey,
+    res.status(201).json({
+      status: 'success',
+      data: {
+        objectKey,
+      },
     });
-    res.sendStatus(200);
   },
   abort: (err, req, res, next) => {
+    logger.error('abort called');
     const busboy = res.locals.busboy;
     const workQueue = res.locals.workQueue;
 
@@ -112,6 +105,27 @@ export default {
       workQueue.pause();
     }
 
+    next(err);
+  },
+  closeConnectionOnError: (err, req, res, next) => {
+    logger.error('closeConnectionOnError called');
+    //this instruction automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
+    res.header('Connection', 'close');
+    next(err);
+  },
+  publishUploadedMsg: (req, res, next) => {
+    logger.info('publishUploadedMsg called');
+    const filename = res.locals.filename;
+    const objectKey = res.locals.objectKey;
+
+    publisher.publishUploadedMsg(filename, objectKey);
+    next();
+  },
+  publishErrorMsg: (err, req, res, next) => {
+    logger.error('publishErrorMsg called');
+    const filename = res.locals.filename;
+    const objectKey = res.locals.objectKey;
+    publisher.publishErrorMsg(filename, objectKey);
     next(err);
   },
 };
