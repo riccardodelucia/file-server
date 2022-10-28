@@ -3,7 +3,9 @@ import downloadController from '../controllers/downloadController.js';
 import authController from '../controllers/authController.js';
 import { checkObjectKeyUser } from '../controllers/middleware.js';
 
-const PROTECTED = process.env.FILESERVER_PROTECTED === 'true';
+const PROTECTED = process.env.PROTECTED
+  ? process.env.PROTECTED === 'true'
+  : true;
 
 const router = express.Router({ mergeParams: true });
 

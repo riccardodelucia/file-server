@@ -9,9 +9,6 @@ const messageStatus = {
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
-const PUBLISHER = process.env.FILESERVER_PUBLISHER === 'true';
-
-logger.info(`Publisher configured: ${PUBLISHER}`);
 
 let redis = undefined;
 // This method is structured as a memoized factory function because we need to avoid the instantiation of a Redis instance when the publisher is disabled.

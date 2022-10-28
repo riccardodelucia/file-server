@@ -13,11 +13,15 @@ const logger = winston.createLogger({
 // Constants
 const PORT = 8080;
 const HOST = '0.0.0.0';
-const PROTECTED = process.env.FILESERVER_PROTECTED === 'true';
-const PUBLISHER = process.env.FILESERVER_PUBLISHER === 'true';
+const PROTECTED = process.env.PROTECTED
+  ? process.env.PROTECTED === 'true'
+  : true;
+const PUBLISHER = process.env.PUBLISHER
+  ? process.env.PUBLISHER === 'true'
+  : true;
 
-logger.warn(`Service is protected: ${PROTECTED}`);
-logger.warn(`Service has publisher configured: ${PUBLISHER}`);
+logger.info(`Service is protected: ${PROTECTED}`);
+logger.info(`Service has publisher configured: ${PUBLISHER}`);
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception! Shutting Down...');
