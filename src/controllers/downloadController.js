@@ -23,7 +23,7 @@ export default {
     res.locals.objectKey = objectKey;
     next();
   },
-  downloadFile: catchAsync(async (req, res, next) => {
+  downloadFile: catchAsync(async (req, res) => {
     const objectKey = res.locals.objectKey;
     logger.info(`Downloading file ${objectKey}`);
     const obj = await download(objectKey);
@@ -56,7 +56,7 @@ export default {
     logger.info(`Content type: ${contentType}`);
 
     res.setHeader('Content-Type', contentType);
+    res.status(200);
     stream.pipe(res);
-    next();
   }),
 };
