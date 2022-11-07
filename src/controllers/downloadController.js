@@ -24,9 +24,10 @@ export default {
     next();
   },
   downloadFile: catchAsync(async (req, res, next) => {
-    logger.info('Downloading file');
     const objectKey = res.locals.objectKey;
+    logger.info(`Downloading file ${objectKey}`);
     const obj = await download(objectKey);
+    logger.info(`File ${objectKey} downloaded`);
     const stream = obj.Body;
 
     // guess mime type from file extension. NOTE: this approach is very naive and definitely not robust. Nevertheless, available npm libraries for guessing the mime type suck, therefore...
@@ -52,6 +53,7 @@ export default {
         contentType = 'application/octet-stream';
         break;
     }
+    logger.info(`Content type: ${contentType}`);
 
     res.setHeader('Content-Type', contentType);
     stream.pipe(res);
