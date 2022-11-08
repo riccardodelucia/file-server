@@ -1,10 +1,7 @@
-import * as dotenv from 'dotenv';
-
-dotenv.config();
-
-//const winston = require('winston');
 import winston from 'winston';
 import app from './app.js';
+
+import config from './config.js';
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -13,12 +10,7 @@ const logger = winston.createLogger({
 // Constants
 const PORT = 8080;
 const HOST = '0.0.0.0';
-const PROTECTED = process.env.PROTECTED
-  ? process.env.PROTECTED === 'true'
-  : true;
-const PUBLISHER = process.env.PUBLISHER
-  ? process.env.PUBLISHER === 'true'
-  : true;
+const { PROTECTED, PUBLISHER } = config;
 
 logger.info(`Service is protected: ${PROTECTED}`);
 logger.info(`Service has publisher configured: ${PUBLISHER}`);

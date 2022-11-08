@@ -100,7 +100,7 @@ tag image:
     - echo $VM_NAME
     - echo $CI_COMMIT_BRANCH
     - echo $CI_ENVIRONMENT_NAME
-    - envsubst < templates/$ENV_FILE > .env
+    - envsubst < templates/deploy.env > .env
     - envsubst < templates/deploy.sh > deploy.sh
     - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
     - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME "mkdir -p $VM_TARGET_DIR"
@@ -113,8 +113,6 @@ deploy to staging:
   environment: staging
   extends: .deploy to environment
   variables:
-    ENV_FILE: staging.env
     TAG: $BUILD
-    TEST: none
   only:
     - staging

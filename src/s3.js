@@ -6,31 +6,37 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import config from './config.js';
 
-const bucketName = process.env.S3_BUCKET_NAME;
-const bucketEndpoint = process.env.S3_ENDPOINT_URL;
-const region = process.env.S3_BUCKET_REGION;
-const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-const secretAccessKey = process.env.S3_SECRET_KEY;
+const {
+  S3_BUCKET_NAME,
+  S3_ENDPOINT_URL,
+  S3_BUCKET_REGION,
+  S3_ACCESS_KEY_ID,
+  S3_SECRET_KEY,
+} = config;
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-logger.info(`Creating/ Attaching to S3 bucket at: ${bucketEndpoint}`);
+logger.info(`Creating/ Attaching to S3 bucket at: ${S3_ENDPOINT_URL}`);
 
 const s3Client = new S3Client({
-  region,
-  endpoint: bucketEndpoint,
+  region: S3_BUCKET_REGION,
+  endpoint: S3_ENDPOINT_URL,
   forcePathStyle: true,
-  credentials: { accessKeyId, secretAccessKey },
+  credentials: {
+    accessKeyId: S3_ACCESS_KEY_ID,
+    secretAccessKey: S3_SECRET_KEY,
+  },
 });
 
 (async () => {
   try {
-    logger.info(`Setting up bucket: ${bucketName}`);
-    await s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
-    logger.info(`Bucket created: ${bucketName}`);
+    logger.info(`Setting up bucket: ${S3_BUCKET_NAME}`);
+    await s3Client.send(new CreateBucketCommand({ Bucket: S3_BUCKET_NAME }));
+    logger.info(`Bucket created: ${S3_BUCKET_NAME}`);
   } catch (err) {
     logger.error('Error', err);
   }
@@ -40,7 +46,7 @@ export const multipartUpload = async (file, objectKey, user = undefined) => {
   logger.info(`Uploading ${objectKey} object`);
 
   const uploadParams = {
-    Bucket: bucketName,
+    Bucket: S3_BUCKET_NAME,
     Body: file,
     Key: objectKey,
   };
@@ -65,7 +71,7 @@ export const download = (objectKey) => {
   logger.info(`Streaming ${objectKey} object to client`);
 
   const downloadParams = {
-    Bucket: bucketName,
+    Bucket: S3_BUCKET_NAME,
     Key: objectKey,
   };
 
@@ -76,7 +82,7 @@ export const download = (objectKey) => {
 
 export const checkObjectExistence = async (objectKey) => {
   const commandParams = {
-    Bucket: bucketName,
+    Bucket: S3_BUCKET_NAME,
     Key: objectKey,
   };
   const command = new HeadObjectCommand(commandParams);

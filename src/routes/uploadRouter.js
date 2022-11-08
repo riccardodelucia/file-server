@@ -3,12 +3,9 @@ import uploadController from '../controllers/uploadController.js';
 import authController from '../controllers/authController.js';
 import { checkObjectKeyUser } from '../controllers/middleware.js';
 
-const PROTECTED = process.env.PROTECTED
-  ? process.env.PROTECTED === 'true'
-  : true;
-const PUBLISHER = process.env.PUBLISHER
-  ? process.env.PUBLISHER === 'true'
-  : true;
+import config from '../config.js';
+
+const { PROTECTED, PUBLISHER } = config;
 
 const router = express.Router({ mergeParams: true });
 

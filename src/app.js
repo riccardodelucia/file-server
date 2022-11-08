@@ -12,39 +12,43 @@ import downloadRouter from './routes/downloadRouter.js';
 
 import errorController from './controllers/errorController.js';
 
+import config from './config.js';
+
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
 // Env vars
-const environment = process.env.NODE_ENV;
-const build = process.env.BUILD;
-const version = process.env.VERSION;
-const corsOrigins = process.env.CORS_ORIGINS_FILESERVER?.split(', ') || '';
-const corsMethods = process.env.CORS_METHODS_FILESERVER?.split(', ') || '';
-const JSONSizeLimit = process.env.JSON_SIZE_LIMIT;
-const uploadMaxFileSize = process.env.UPLOAD_MAX_FILE_SIZE;
-const rateLimitMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS;
-const rateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS;
+const {
+  NODE_ENV,
+  BUILD,
+  VERSION,
+  CORS_ORIGINS,
+  CORS_METHODS,
+  JSON_SIZE_LIMIT,
+  UPLOAD_MAX_FILE_SIZE,
+  RATE_LIMIT_MAX_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+} = config;
 
 // App
 const app = express();
 
-if (environment === 'development') {
-  logger.info('DEV environment');
+if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
-  app.use(cors());
-} else if (environment === 'production') {
+} else if (NODE_ENV === 'production') {
   app.enable('trust proxy');
-  logger.info('PROD environment');
   app.use(morgan('combined'));
-  app.use(
-    cors({
-      origin: corsOrigins,
-      methods: corsMethods,
-    })
-  );
-} else throw new Error(`Wrong ENV_VAR value: ${environment}`);
+} else throw new Error(`Wrong ENV_VAR value: ${NODE_ENV}`);
+
+logger.info(`NODE_ENV: ${NODE_ENV}`);
+
+app.use(
+  cors({
+    origin: CORS_ORIGINS,
+    methods: CORS_METHODS,
+  })
+);
 
 const ms2TimeString = (ms) => {
   const seconds = Math.floor(ms / 1000);
@@ -62,10 +66,10 @@ const ms2TimeString = (ms) => {
 };
 
 const limiter = rateLimit({
-  max: rateLimitMaxRequests,
-  windowMs: rateLimitWindowMs,
+  max: RATE_LIMIT_MAX_REQUESTS,
+  windowMs: RATE_LIMIT_WINDOW_MS,
   message: `Too many requests from this IP, please try again in ${ms2TimeString(
-    rateLimitWindowMs
+    RATE_LIMIT_WINDOW_MS
   )}`,
 });
 
@@ -73,18 +77,18 @@ app.use(limiter);
 
 app.use(helmet());
 
-app.use(express.json({ limit: JSONSizeLimit }));
-app.use(express.urlencoded({ extended: true, limit: uploadMaxFileSize })); //max allowed file upload size
+app.use(express.json({ limit: JSON_SIZE_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: UPLOAD_MAX_FILE_SIZE })); //max allowed file upload size and built-in body parser
 app.use(xss());
 
-app.use(hpp()); //no query parameters allowed so far
+app.use(hpp());
 
 // Routes
 app.use('/upload', uploadRouter);
 app.use('/download', downloadRouter);
 
 app.get('/', (req, res) => {
-  res.json({ build, version });
+  res.json({ build: BUILD, version: VERSION });
 });
 
 app.use(errorController.globalErrorMiddleware);

@@ -6,15 +6,15 @@ import NodeCache from 'node-cache';
 import axios from 'axios';
 import winston from 'winston';
 
+import config from '../config.js';
+
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-const authJWKSUri = process.env.URL_AUTH_JWKS;
+const { AUTH_JWKS_URL, AUTH_TOKEN_AUDIENCE } = config;
 
 const x509Cache = new NodeCache({ stdTTL: 60, checkperiod: 70 });
-
-const audience = process.env.AUTH_TOKEN_AUDIENCE;
 
 const retrieveX509Certificate = async () => {
   logger.info(`Retrieving x509 certificate from cache`);
@@ -22,7 +22,7 @@ const retrieveX509Certificate = async () => {
   let x509 = x509Cache.get('x509');
   if (x509 == undefined) {
     logger.warn(`x509 cache miss. Reading from server`);
-    const res = await axios.get(authJWKSUri);
+    const res = await axios.get(AUTH_JWKS_URL);
     const key = res.data.keys.find((key) => key.use === 'sig');
     logger.info(`Got x509 from server`);
     const cert = `-----BEGIN CERTIFICATE-----\n${key.x5c[0]}\n-----END CERTIFICATE-----`;
@@ -73,7 +73,7 @@ export default {
     logger.info(`Verifying token with public key`);
 
     const { payload } = await jose.jwtVerify(jwt, publicKey, {
-      audience,
+      audience: AUTH_TOKEN_AUDIENCE,
     });
 
     logger.info(`User '${payload?.preferred_username}' authorized`);

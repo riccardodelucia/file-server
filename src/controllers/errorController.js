@@ -1,5 +1,8 @@
 import winston from 'winston';
 import { AppError } from '../utils/appError.js';
+import config from '../config.js';
+
+const { NODE_ENV } = config;
 
 const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
@@ -69,9 +72,9 @@ export default {
 
     const error = parsedError ? parsedError : err;
 
-    if (process.env.NODE_ENV === 'development') {
+    if (NODE_ENV === 'development') {
       sendErrorDev(error, res);
-    } else if (process.env.NODE_ENV === 'production') {
+    } else if (NODE_ENV === 'production') {
       sendErrorProd(error, res);
     }
     next(err);
