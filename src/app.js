@@ -87,7 +87,7 @@ app.use(hpp());
 app.use('/upload', uploadRouter);
 app.use('/download', downloadRouter);
 
-app.get('/', (req, res) => {
+app.get('/release', (req, res) => {
   res.json({ build: BUILD, version: VERSION });
 });
 

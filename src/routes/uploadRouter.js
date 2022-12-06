@@ -1,9 +1,13 @@
 import express from 'express';
 import uploadController from '../controllers/uploadController.js';
 import authController from '../controllers/authController.js';
-import { checkObjectKeyUser } from '../controllers/middleware.js';
+import winston from 'winston';
 
 import config from '../config.js';
+
+const logger = winston.createLogger({
+  transports: [new winston.transports.Console()],
+});
 
 const { PROTECTED, PUBLISHER } = config;
 
@@ -13,12 +17,14 @@ let middlewareChain = [];
 let errorChain = [];
 
 if (PROTECTED) {
+  logger.info('uploadRouter is protected');
+
   router.use(authController.protect);
 
   middlewareChain = middlewareChain.concat([
     uploadController.checkObjectKey,
-    checkObjectKeyUser,
-    uploadController.validateNewFileUpload,
+    authController.validateObjectKeyAgainstUser,
+    uploadController.validateNewObjectKeyUpload,
     uploadController.uploadFile,
   ]);
 
@@ -28,6 +34,7 @@ if (PROTECTED) {
   ]);
 
   if (PUBLISHER) {
+    logger.info('Publish/Subscribe is active');
     middlewareChain.push(uploadController.publishUploadedMsg);
     errorChain.push(uploadController.publishErrorMsg);
   }
@@ -36,7 +43,7 @@ if (PROTECTED) {
 } else {
   middlewareChain = middlewareChain.concat([
     uploadController.checkObjectKey,
-    uploadController.validateNewFileUpload,
+    uploadController.validateNewObjectKeyUpload,
     uploadController.uploadFile,
   ]);
   errorChain = errorChain.concat([

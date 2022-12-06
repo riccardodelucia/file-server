@@ -25,10 +25,10 @@ export default {
     res.locals.objectKey = objectKey;
     next();
   },
-  validateNewFileUpload: catchAsync(async (req, res, next) => {
+  validateNewObjectKeyUpload: catchAsync(async (req, res, next) => {
     // we check whether the uploading object key already corresponds to an uploaded object
     // NOTE: this could have been don by inspecting the db as well. Since the unprotected version of the file server doesn't use a db, the object existence check is done by looking at the S3 bucket content
-    logger.info('validateFileUpload called');
+    logger.info('validateNewObjectKeyUpload called');
     const objectKey = res.locals.objectKey;
     const objectExists = await checkObjectExistence(objectKey);
     if (objectExists)

@@ -82,4 +82,21 @@ export default {
 
     next();
   }),
+  validateObjectKeyAgainstUser: (req, res, next) => {
+    logger.info(`validateObjectKeyAgainstUser middleware called`);
+    const objectKey = res.locals.objectKey;
+    const user = res.locals.user;
+
+    const parts = objectKey.split('/');
+
+    if (parts[1] !== user)
+      return next(
+        new AppError(
+          `Object key ${objectKey} does not start with username ${user}`,
+          403
+        )
+      );
+
+    return next();
+  },
 };
