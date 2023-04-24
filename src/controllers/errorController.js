@@ -77,6 +77,6 @@ export default {
     } else if (NODE_ENV === 'production') {
       sendErrorProd(error, res);
     }
-    next(err);
+    return next(err);
   },
 };

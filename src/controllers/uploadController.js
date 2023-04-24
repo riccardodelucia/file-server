@@ -23,7 +23,7 @@ export default {
       throw new AppError('Missing "X-Object-Key" header', 400);
     }
     res.locals.objectKey = objectKey;
-    next();
+    return next();
   },
   validateNewObjectKeyUpload: catchAsync(async (req, res, next) => {
     // we check whether the uploading object key already corresponds to an uploaded object
@@ -69,15 +69,15 @@ export default {
     });
 
     busboy.on('finish', () => {
-      next();
+      return next();
     });
 
     req.on('aborted', () => {
-      next(new Error('Connection aborted'), 499);
+      return next(new Error('Connection aborted'), 499);
     });
 
     busboy.on('error', (err) => {
-      next(err);
+      return next(err);
     });
 
     res.locals.busboy = busboy;
@@ -87,7 +87,7 @@ export default {
   },
   sendUploadedResponse: (req, res) => {
     const objectKey = res.locals.objectKey;
-    res.status(201).json({
+    return res.status(201).json({
       status: 'success',
       data: {
         objectKey,
@@ -105,27 +105,27 @@ export default {
       workQueue.pause();
     }
 
-    next(err);
+    return next(err);
   },
   closeConnectionOnError: (err, req, res, next) => {
     logger.error('closeConnectionOnError called');
     //this instruction automatically closes the socket with the client -> it allows to interrupt file uploads from the client browser
     res.header('Connection', 'close');
-    next(err);
+    return next(err);
   },
-  publishUploadedMsg: (req, res, next) => {
+  publishUploadedMsg: catchAsync(async (req, res, next) => {
     logger.info('publishUploadedMsg called');
     const filename = res.locals.filename;
     const objectKey = res.locals.objectKey;
 
-    publisher.publishUploadedMsg(filename, objectKey);
-    next();
-  },
-  publishErrorMsg: (err, req, res, next) => {
+    await publisher.publishUploadedMsg(filename, objectKey);
+    return next();
+  }),
+  publishErrorMsg: async (err, req, res, next) => {
     logger.error('publishErrorMsg called');
     const filename = res.locals.filename;
     const objectKey = res.locals.objectKey;
-    publisher.publishErrorMsg(filename, objectKey);
-    next(err);
+    await publisher.publishErrorMsg(filename, objectKey);
+    return next(err);
   },
 };

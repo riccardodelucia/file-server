@@ -21,7 +21,7 @@ export default {
         )
       );
     res.locals.objectKey = objectKey;
-    next();
+    return next();
   },
   downloadFile: catchAsync(async (req, res) => {
     const objectKey = res.locals.objectKey;

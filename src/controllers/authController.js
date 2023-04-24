@@ -80,7 +80,7 @@ export default {
 
     res.locals.user = payload?.preferred_username || 'user';
 
-    next();
+    return next();
   }),
   validateObjectKeyAgainstUser: (req, res, next) => {
     logger.info(`validateObjectKeyAgainstUser middleware called`);
