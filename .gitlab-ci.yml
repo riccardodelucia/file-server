@@ -100,9 +100,9 @@ tag image:
     - echo $VM_NAME
     - echo $CI_COMMIT_BRANCH
     - echo $CI_ENVIRONMENT_NAME
-    - envsubst < templates/deploy.env > .env
-    - envsubst < templates/deploy.sh > deploy.sh
-    - envsubst < templates/docker-compose.deploy.yml > docker-compose.deploy.yml
+    - envsubst < deploy/deploy.env > .env
+    - envsubst < deploy/deploy.sh > deploy.sh
+    - envsubst < deploy/docker-compose.deploy.yml > docker-compose.deploy.yml
     - ssh -l $VM_USER -o StrictHostKeyChecking=no $VM_NAME "mkdir -p $VM_TARGET_DIR"
     - scp deploy.sh $VM_USER@$VM_NAME:$VM_TARGET_DIR/deploy.sh
     - scp docker-compose.deploy.yml $VM_USER@$VM_NAME:$VM_TARGET_DIR/docker-compose.yml
